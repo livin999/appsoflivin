@@ -1,0 +1,582 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>WoMe — Admin Dashboard</title>
+<meta name="robots" content="noindex, nofollow" />
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.7/dist/chart.umd.min.js"></script>
+<style>
+  :root {
+    --coral: #FF6248;
+    --coral-soft: #ff8a76;
+    --violet: #8b7cf6;
+    --teal: #34d5c4;
+    --amber: #f5b942;
+    --bg: #0b0d12;
+    --bg-grad: radial-gradient(circle at 15% 0%, #1a1420 0%, #0b0d12 45%), radial-gradient(circle at 85% 15%, #131a24 0%, #0b0d12 50%);
+    --card: #161922;
+    --card-hover: #1a1e29;
+    --border: #262b38;
+    --text: #f2f3f5;
+    --muted: #9aa1ac;
+    --muted-2: #6b7280;
+    --good: #4ade80;
+    --bad: #ff6b6b;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+    background: var(--bg);
+    background-image: var(--bg-grad);
+    background-attachment: fixed;
+    color: var(--text);
+    -webkit-font-smoothing: antialiased;
+  }
+  header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 18px 28px;
+    border-bottom: 1px solid var(--border);
+    position: sticky;
+    top: 0;
+    background: rgba(11, 13, 18, 0.85);
+    backdrop-filter: blur(10px);
+    z-index: 10;
+  }
+  header .brand { display: flex; align-items: center; gap: 10px; }
+  header .dot {
+    width: 9px; height: 9px; border-radius: 50%;
+    background: var(--good);
+    box-shadow: 0 0 8px var(--good);
+  }
+  header h1 { font-size: 17px; margin: 0; font-weight: 700; letter-spacing: -0.01em; }
+  header h1 span { color: var(--coral); }
+  header .subtitle { font-size: 12px; color: var(--muted-2); margin-left: 12px; }
+
+  .header-actions { display: flex; align-items: center; gap: 14px; }
+
+  #rangeSelect {
+    background: var(--card);
+    border: 1px solid var(--border);
+    color: var(--text);
+    padding: 8px 12px;
+    border-radius: 8px;
+    font-size: 13px;
+    cursor: pointer;
+    display: none;
+  }
+  #rangeSelect:focus { outline: 1px solid var(--coral); }
+
+  #signOutBtn {
+    background: transparent;
+    border: 1px solid var(--border);
+    color: var(--muted);
+    padding: 8px 14px;
+    border-radius: 8px;
+    cursor: pointer;
+    font-size: 13px;
+    display: none;
+  }
+  #signOutBtn:hover { border-color: var(--coral); color: var(--text); }
+
+  main { max-width: 1200px; margin: 0 auto; padding: 28px; }
+
+  #gate {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    min-height: 70vh;
+    text-align: center;
+    gap: 16px;
+  }
+  #gate p { color: var(--muted); max-width: 360px; }
+  #signInBtn {
+    background: linear-gradient(135deg, var(--coral), var(--coral-soft));
+    color: white;
+    border: none;
+    padding: 12px 24px;
+    border-radius: 10px;
+    font-size: 15px;
+    font-weight: 600;
+    cursor: pointer;
+    box-shadow: 0 8px 24px -8px rgba(255, 98, 72, 0.5);
+  }
+  #signInBtn:hover { opacity: 0.92; }
+  #deniedMsg { color: var(--bad); display: none; }
+
+  .grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(190px, 1fr));
+    gap: 14px;
+    margin-bottom: 24px;
+  }
+  .stat-card {
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-radius: 16px;
+    padding: 18px 20px;
+    position: relative;
+    overflow: hidden;
+    transition: transform 0.15s ease, border-color 0.15s ease;
+  }
+  .stat-card:hover { transform: translateY(-2px); border-color: #333a4a; }
+  .stat-card::before {
+    content: "";
+    position: absolute;
+    top: 0; left: 0; right: 0;
+    height: 2px;
+    background: var(--accent, var(--coral));
+  }
+  .stat-card .label {
+    font-size: 11px;
+    color: var(--muted);
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    margin-bottom: 10px;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+  }
+  .stat-card .value { font-size: 30px; font-weight: 700; letter-spacing: -0.02em; }
+  .stat-card .sub { font-size: 12px; color: var(--muted-2); margin-top: 6px; }
+
+  .panels-row {
+    display: grid;
+    grid-template-columns: 2fr 1fr;
+    gap: 18px;
+    margin-bottom: 18px;
+  }
+  @media (max-width: 860px) {
+    .panels-row { grid-template-columns: 1fr; }
+  }
+
+  section.panel {
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-radius: 16px;
+    padding: 22px 24px;
+    margin-bottom: 18px;
+  }
+  section.panel h2 {
+    font-size: 13px;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    color: var(--muted);
+    margin: 0 0 18px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+  }
+  section.panel h2 .hint { font-size: 11px; color: var(--muted-2); text-transform: none; letter-spacing: 0; font-weight: 400; }
+
+  .chart-wrap { position: relative; height: 260px; }
+  .chart-wrap.tall { height: 300px; }
+  .chart-wrap.donut { height: 220px; }
+
+  .charts-grid {
+    display: grid;
+    grid-template-columns: repeat(2, 1fr);
+    gap: 18px;
+  }
+  @media (max-width: 860px) {
+    .charts-grid { grid-template-columns: 1fr; }
+  }
+
+  .legend-list { display: flex; flex-wrap: wrap; gap: 10px; margin-top: 14px; }
+  .legend-item { display: flex; align-items: center; gap: 6px; font-size: 12px; color: var(--muted); }
+  .legend-swatch { width: 10px; height: 10px; border-radius: 3px; flex-shrink: 0; }
+
+  #loadingMsg, #errorMsg { text-align: center; color: var(--muted); padding: 80px 0; }
+  #loadingMsg .spinner {
+    width: 28px; height: 28px; margin: 0 auto 16px;
+    border: 3px solid var(--border);
+    border-top-color: var(--coral);
+    border-radius: 50%;
+    animation: spin 0.8s linear infinite;
+  }
+  @keyframes spin { to { transform: rotate(360deg); } }
+  #errorMsg { color: var(--bad); display: none; }
+  #dashboardContent { display: none; }
+  footer { text-align: center; color: var(--muted-2); font-size: 12px; padding: 24px; }
+</style>
+</head>
+<body>
+
+<header>
+  <div class="brand">
+    <span class="dot"></span>
+    <h1>Wo<span>Me</span> — Admin Dashboard</h1>
+    <span class="subtitle" id="generatedAt"></span>
+  </div>
+  <div class="header-actions">
+    <select id="rangeSelect">
+      <option value="7">Last 7 days</option>
+      <option value="30" selected>Last 30 days</option>
+      <option value="90">Last 90 days</option>
+      <option value="365">Last 12 months</option>
+    </select>
+    <button id="signOutBtn">Sign out</button>
+  </div>
+</header>
+
+<main>
+  <div id="gate">
+    <p>Sign in with the WoMe owner Google account to view live usage metrics.</p>
+    <button id="signInBtn">Sign in with Google</button>
+    <p id="deniedMsg">That account isn't authorized to view this dashboard.</p>
+  </div>
+
+  <div id="loadingMsg" style="display:none;"><div class="spinner"></div>Loading stats…</div>
+  <div id="errorMsg"></div>
+
+  <div id="dashboardContent">
+    <div class="grid" id="statGrid"></div>
+
+    <div class="panels-row">
+      <section class="panel">
+        <h2>Signups <span class="hint" id="signupRangeHint"></span></h2>
+        <div class="chart-wrap tall"><canvas id="signupChart"></canvas></div>
+      </section>
+
+      <section class="panel">
+        <h2>Pro Conversion</h2>
+        <div class="chart-wrap donut"><canvas id="conversionChart"></canvas></div>
+        <div class="legend-list" id="conversionLegend"></div>
+      </section>
+    </div>
+
+    <div class="charts-grid">
+      <section class="panel">
+        <h2>Users by Level</h2>
+        <div class="chart-wrap"><canvas id="levelChart"></canvas></div>
+      </section>
+
+      <section class="panel">
+        <h2>Meaning Language</h2>
+        <div class="chart-wrap"><canvas id="languageChart"></canvas></div>
+      </section>
+    </div>
+
+    <section class="panel">
+      <h2>Content</h2>
+      <div class="chart-wrap donut"><canvas id="contentChart"></canvas></div>
+      <div class="legend-list" id="contentLegend"></div>
+    </section>
+  </div>
+</main>
+
+<footer>WoMe internal metrics — data refreshes on sign-in and range change</footer>
+
+<script type="module">
+  import { initializeApp } from "https://www.gstatic.com/firebasejs/11.4.0/firebase-app.js";
+  import {
+    getAuth,
+    GoogleAuthProvider,
+    signInWithPopup,
+    signOut,
+    onAuthStateChanged,
+  } from "https://www.gstatic.com/firebasejs/11.4.0/firebase-auth.js";
+  import {
+    getFunctions,
+    httpsCallable,
+  } from "https://www.gstatic.com/firebasejs/11.4.0/firebase-functions.js";
+
+  const firebaseConfig = {
+    projectId: "wome-app",
+    appId: "1:696935737205:web:9fee032bb29c3ff410953c",
+    storageBucket: "wome-app.firebasestorage.app",
+    apiKey: "AIzaSyCaNIyMaxb5g1TcmGebjS8hmYpgTH3wWtI",
+    authDomain: "wome-app.firebaseapp.com",
+    messagingSenderId: "696935737205",
+  };
+
+  const app = initializeApp(firebaseConfig);
+  const auth = getAuth(app);
+  const functions = getFunctions(app, "us-central1");
+
+  const gate = document.getElementById("gate");
+  const signInBtn = document.getElementById("signInBtn");
+  const signOutBtn = document.getElementById("signOutBtn");
+  const deniedMsg = document.getElementById("deniedMsg");
+  const loadingMsg = document.getElementById("loadingMsg");
+  const errorMsg = document.getElementById("errorMsg");
+  const dashboardContent = document.getElementById("dashboardContent");
+  const rangeSelect = document.getElementById("rangeSelect");
+
+  let charts = {};
+  let currentUser = null;
+  let loadStatsSeq = 0;
+
+  signInBtn.addEventListener("click", async () => {
+    deniedMsg.style.display = "none";
+    try {
+      await signInWithPopup(auth, new GoogleAuthProvider());
+    } catch (e) {
+      console.error(e);
+    }
+  });
+
+  signOutBtn.addEventListener("click", () => signOut(auth));
+  rangeSelect.addEventListener("change", () => loadStats());
+
+  onAuthStateChanged(auth, async (user) => {
+    currentUser = user;
+    if (!user) {
+      gate.style.display = "flex";
+      signOutBtn.style.display = "none";
+      rangeSelect.style.display = "none";
+      dashboardContent.style.display = "none";
+      loadingMsg.style.display = "none";
+      return;
+    }
+
+    signOutBtn.style.display = "inline-block";
+    rangeSelect.style.display = "inline-block";
+    gate.style.display = "none";
+    await loadStats();
+  });
+
+  async function loadStats() {
+    const seq = ++loadStatsSeq;
+    loadingMsg.style.display = "block";
+    dashboardContent.style.display = "none";
+    errorMsg.style.display = "none";
+
+    try {
+      const getAdminStats = httpsCallable(functions, "getAdminStats");
+      const result = await getAdminStats({ rangeDays: Number(rangeSelect.value) });
+      if (seq !== loadStatsSeq) return; // a newer range change superseded this request
+      renderStats(result.data);
+      loadingMsg.style.display = "none";
+      dashboardContent.style.display = "block";
+    } catch (e) {
+      if (seq !== loadStatsSeq) return;
+      loadingMsg.style.display = "none";
+      if (e && e.code === "functions/permission-denied") {
+        await signOut(auth);
+        gate.style.display = "flex";
+        deniedMsg.style.display = "block";
+      } else {
+        errorMsg.textContent = "Failed to load stats: " + (e?.message || e);
+        errorMsg.style.display = "block";
+      }
+    }
+  }
+
+  const LEVEL_NAMES = [
+    "1 · Beginner", "2 · Elementary", "3 · Intermediate", "4 · Advanced",
+    "5 · Expert", "6 · Master", "7 · Legend",
+  ];
+
+  const PALETTE = ["#FF6248", "#8b7cf6", "#34d5c4", "#f5b942", "#4ade80", "#60a5fa", "#f472b6", "#facc15", "#a78bfa", "#2dd4bf", "#fb923c", "#e879f9"];
+
+  Chart.defaults.color = "#9aa1ac";
+  Chart.defaults.font.family = "-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif";
+  Chart.defaults.font.size = 12;
+
+  function statCard(label, value, sub, accent) {
+    const div = document.createElement("div");
+    div.className = "stat-card";
+    if (accent) div.style.setProperty("--accent", accent);
+    div.innerHTML = `<div class="label">${label}</div><div class="value">${value}</div>${sub ? `<div class="sub">${sub}</div>` : ""}`;
+    return div;
+  }
+
+  function destroyChart(key) {
+    if (charts[key]) {
+      charts[key].destroy();
+      delete charts[key];
+    }
+  }
+
+  function renderStats(stats) {
+    const grid = document.getElementById("statGrid");
+    grid.innerHTML = "";
+
+    const conversionPct = stats.totalUsers > 0
+      ? ((stats.proUsers / stats.totalUsers) * 100).toFixed(1) + "%"
+      : "—";
+
+    grid.appendChild(statCard("Total Users", stats.totalUsers, null, "#FF6248"));
+    grid.appendChild(statCard("Pro Subscribers", stats.proUsers, `${conversionPct} conversion`, "#8b7cf6"));
+    grid.appendChild(statCard("Custom Words Ready", stats.customWordsReady, null, "#34d5c4"));
+    grid.appendChild(statCard("Custom Words Pending", stats.customWordsPending, null, "#f5b942"));
+    grid.appendChild(statCard("Unique AI Words Cached", stats.communityWordsUnique, "shared across all users", "#4ade80"));
+    grid.appendChild(statCard("Signups (7d)", stats.signups?.last7d ?? 0, null, "#60a5fa"));
+    grid.appendChild(statCard("Signups (30d)", stats.signups?.last30d ?? 0, null, "#f472b6"));
+
+    document.getElementById("signupRangeHint").textContent =
+      `over the last ${stats.rangeDays} day${stats.rangeDays === 1 ? "" : "s"}`;
+
+    // Signups over time — line chart
+    destroyChart("signup");
+    const series = stats.signupSeries || [];
+    const labelFmt = (iso) => {
+      const d = new Date(iso + "T00:00:00Z");
+      return stats.rangeDays > 90
+        ? d.toLocaleDateString(undefined, { month: "short", year: "2-digit" })
+        : d.toLocaleDateString(undefined, { month: "short", day: "numeric" });
+    };
+    const ctxSignup = document.getElementById("signupChart").getContext("2d");
+    const gradient = ctxSignup.createLinearGradient(0, 0, 0, 260);
+    gradient.addColorStop(0, "rgba(255, 98, 72, 0.35)");
+    gradient.addColorStop(1, "rgba(255, 98, 72, 0)");
+    charts.signup = new Chart(ctxSignup, {
+      type: "line",
+      data: {
+        labels: series.map((p) => labelFmt(p.date)),
+        datasets: [{
+          label: "Signups",
+          data: series.map((p) => p.count),
+          borderColor: "#FF6248",
+          backgroundColor: gradient,
+          fill: true,
+          tension: 0.35,
+          pointRadius: series.length > 60 ? 0 : 2,
+          pointBackgroundColor: "#FF6248",
+          borderWidth: 2,
+        }],
+      },
+      options: {
+        responsive: true,
+        maintainAspectRatio: false,
+        plugins: { legend: { display: false } },
+        scales: {
+          x: { grid: { display: false }, ticks: { maxTicksLimit: 10 } },
+          y: { beginAtZero: true, grid: { color: "#1f232f" }, ticks: { precision: 0 } },
+        },
+      },
+    });
+
+    // Pro conversion — donut
+    destroyChart("conversion");
+    const free = Math.max(0, stats.totalUsers - stats.proUsers);
+    charts.conversion = new Chart(document.getElementById("conversionChart"), {
+      type: "doughnut",
+      data: {
+        labels: ["Pro", "Free"],
+        datasets: [{
+          data: [stats.proUsers, free],
+          backgroundColor: ["#FF6248", "#262b38"],
+          borderWidth: 0,
+        }],
+      },
+      options: {
+        responsive: true,
+        maintainAspectRatio: false,
+        cutout: "72%",
+        plugins: { legend: { display: false } },
+      },
+    });
+    renderLegend("conversionLegend", [
+      { label: `Pro — ${stats.proUsers}`, color: "#FF6248" },
+      { label: `Free — ${free}`, color: "#262b38" },
+    ]);
+
+    // Users by level — bar
+    destroyChart("level");
+    charts.level = new Chart(document.getElementById("levelChart"), {
+      type: "bar",
+      data: {
+        labels: (stats.levelCounts || []).map((l) => LEVEL_NAMES[l.level - 1] ?? `Level ${l.level}`),
+        datasets: [{
+          data: (stats.levelCounts || []).map((l) => l.count),
+          backgroundColor: "#8b7cf6",
+          borderRadius: 6,
+          maxBarThickness: 34,
+        }],
+      },
+      options: {
+        responsive: true,
+        maintainAspectRatio: false,
+        indexAxis: "y",
+        plugins: { legend: { display: false } },
+        scales: {
+          x: { beginAtZero: true, grid: { color: "#1f232f" }, ticks: { precision: 0 } },
+          y: { grid: { display: false } },
+        },
+      },
+    });
+
+    // Meaning language — bar, sorted, only non-zero
+    destroyChart("language");
+    const langData = (stats.languageCounts || [])
+      .filter((l) => l.count > 0)
+      .sort((a, b) => b.count - a.count);
+    const languageWrap = document.getElementById("languageChart").parentElement;
+    if (langData.length === 0) {
+      languageWrap.innerHTML = '<p style="color:var(--muted-2);font-size:13px;text-align:center;padding-top:80px;">No language selections synced yet.</p>';
+    } else {
+      if (!document.getElementById("languageChart")) {
+        languageWrap.innerHTML = '<canvas id="languageChart"></canvas>';
+      }
+      charts.language = new Chart(document.getElementById("languageChart"), {
+        type: "bar",
+        data: {
+          labels: langData.map((l) => l.language),
+          datasets: [{
+            data: langData.map((l) => l.count),
+            backgroundColor: langData.map((_, i) => PALETTE[i % PALETTE.length]),
+            borderRadius: 6,
+            maxBarThickness: 34,
+          }],
+        },
+        options: {
+          responsive: true,
+          maintainAspectRatio: false,
+          indexAxis: "y",
+          plugins: { legend: { display: false } },
+          scales: {
+            x: { beginAtZero: true, grid: { color: "#1f232f" }, ticks: { precision: 0 } },
+            y: { grid: { display: false } },
+          },
+        },
+      });
+    }
+
+    // Content — custom words ready/pending, community words
+    destroyChart("content");
+    charts.content = new Chart(document.getElementById("contentChart"), {
+      type: "doughnut",
+      data: {
+        labels: ["Custom Words Ready", "Custom Words Pending", "Unique AI Words Cached"],
+        datasets: [{
+          data: [stats.customWordsReady, stats.customWordsPending, stats.communityWordsUnique],
+          backgroundColor: ["#34d5c4", "#f5b942", "#4ade80"],
+          borderWidth: 0,
+        }],
+      },
+      options: {
+        responsive: true,
+        maintainAspectRatio: false,
+        cutout: "68%",
+        plugins: { legend: { display: false } },
+      },
+    });
+    renderLegend("contentLegend", [
+      { label: `Ready — ${stats.customWordsReady}`, color: "#34d5c4" },
+      { label: `Pending — ${stats.customWordsPending}`, color: "#f5b942" },
+      { label: `Cached — ${stats.communityWordsUnique}`, color: "#4ade80" },
+    ]);
+
+    document.getElementById("generatedAt").textContent =
+      "Updated " + new Date(stats.generatedAt).toLocaleTimeString();
+  }
+
+  function renderLegend(elId, items) {
+    const el = document.getElementById(elId);
+    el.innerHTML = "";
+    for (const item of items) {
+      const div = document.createElement("div");
+      div.className = "legend-item";
+      div.innerHTML = `<span class="legend-swatch" style="background:${item.color}"></span>${item.label}`;
+      el.appendChild(div);
+    }
+  }
+</script>
+</body>
+</html>
