@@ -47,6 +47,13 @@
     z-index: 10;
   }
   header .brand { display: flex; align-items: center; gap: 10px; }
+  .back-link {
+    color: var(--muted);
+    text-decoration: none;
+    font-size: 13px;
+    margin-right: 4px;
+  }
+  .back-link:hover { color: var(--text); }
   header .dot {
     width: 9px; height: 9px; border-radius: 50%;
     background: var(--good);
@@ -144,16 +151,6 @@
   .stat-card .value { font-size: 30px; font-weight: 700; letter-spacing: -0.02em; }
   .stat-card .sub { font-size: 12px; color: var(--muted-2); margin-top: 6px; }
 
-  .panels-row {
-    display: grid;
-    grid-template-columns: 2fr 1fr;
-    gap: 18px;
-    margin-bottom: 18px;
-  }
-  @media (max-width: 860px) {
-    .panels-row { grid-template-columns: 1fr; }
-  }
-
   section.panel {
     background: var(--card);
     border: 1px solid var(--border);
@@ -172,6 +169,7 @@
     justify-content: space-between;
   }
   section.panel h2 .hint { font-size: 11px; color: var(--muted-2); text-transform: none; letter-spacing: 0; font-weight: 400; }
+  .panel-desc { font-size: 12px; color: var(--muted-2); margin: -10px 0 16px; line-height: 1.4; }
 
   .chart-wrap { position: relative; height: 260px; }
   .chart-wrap.tall { height: 300px; }
@@ -208,6 +206,7 @@
 
 <header>
   <div class="brand">
+    <a class="back-link" href="https://livin999.github.io/appsoflivin/apps/wome.html" title="Back to WoMe on Apps of Livin">&larr; Apps of Livin</a>
     <span class="dot"></span>
     <h1>Wo<span>Me</span> — Admin Dashboard</h1>
     <span class="subtitle" id="generatedAt"></span>
@@ -236,36 +235,49 @@
   <div id="dashboardContent">
     <div class="grid" id="statGrid"></div>
 
-    <div class="panels-row">
+    <div class="charts-grid">
       <section class="panel">
         <h2>Signups <span class="hint" id="signupRangeHint"></span></h2>
+        <p class="panel-desc">New user accounts created each day, from Firebase Auth.</p>
         <div class="chart-wrap tall"><canvas id="signupChart"></canvas></div>
       </section>
 
       <section class="panel">
-        <h2>Pro Conversion</h2>
-        <div class="chart-wrap donut"><canvas id="conversionChart"></canvas></div>
-        <div class="legend-list" id="conversionLegend"></div>
+        <h2>Activity <span class="hint" id="activityRangeHint"></span></h2>
+        <p class="panel-desc">Flashcards reviewed each day, summed across all users.</p>
+        <div class="chart-wrap tall"><canvas id="activityChart"></canvas></div>
       </section>
     </div>
 
     <div class="charts-grid">
       <section class="panel">
-        <h2>Users by Level</h2>
-        <div class="chart-wrap"><canvas id="levelChart"></canvas></div>
+        <h2>Pro Conversion</h2>
+        <p class="panel-desc">Share of total users with an active Pro subscription.</p>
+        <div class="chart-wrap donut"><canvas id="conversionChart"></canvas></div>
+        <div class="legend-list" id="conversionLegend"></div>
       </section>
 
       <section class="panel">
-        <h2>Meaning Language</h2>
-        <div class="chart-wrap"><canvas id="languageChart"></canvas></div>
+        <h2>Users by Level</h2>
+        <p class="panel-desc">Users grouped by the level they chose (or were placed at) during onboarding.</p>
+        <div class="chart-wrap"><canvas id="levelChart"></canvas></div>
       </section>
     </div>
 
-    <section class="panel">
-      <h2>Content</h2>
-      <div class="chart-wrap donut"><canvas id="contentChart"></canvas></div>
-      <div class="legend-list" id="contentLegend"></div>
-    </section>
+    <div class="charts-grid">
+      <section class="panel">
+        <h2>Meaning Language</h2>
+        <p class="panel-desc">Language users chose to see word meanings translated into.</p>
+        <div class="chart-wrap" id="languageChartWrap"><canvas id="languageChart"></canvas></div>
+      </section>
+
+      <section class="panel">
+        <h2>Content</h2>
+        <p class="panel-desc">AI-generated custom words: ready to study, still generating, and unique words cached for reuse across all users.</p>
+        <div class="chart-wrap donut"><canvas id="contentChart"></canvas></div>
+        <div class="legend-list" id="contentLegend"></div>
+      </section>
+    </div>
   </div>
 </main>
 
@@ -378,6 +390,24 @@
   Chart.defaults.font.family = "-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif";
   Chart.defaults.font.size = 12;
 
+  // Draws a big number in the middle of a doughnut chart when
+  // options.plugins.centerText.text is set. No-op for every other chart.
+  Chart.register({
+    id: "centerText",
+    afterDraw(chart) {
+      const opts = chart.options.plugins?.centerText;
+      if (!opts?.text) return;
+      const { ctx, chartArea: { width, height, left, top } } = chart;
+      ctx.save();
+      ctx.font = "700 24px -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif";
+      ctx.fillStyle = "#f2f3f5";
+      ctx.textAlign = "center";
+      ctx.textBaseline = "middle";
+      ctx.fillText(opts.text, left + width / 2, top + height / 2);
+      ctx.restore();
+    },
+  });
+
   function statCard(label, value, sub, accent) {
     const div = document.createElement("div");
     div.className = "stat-card";
@@ -452,6 +482,42 @@
       },
     });
 
+    // Activity — line chart, cards reviewed per day
+    destroyChart("activity");
+    const activitySeries = stats.activitySeries || [];
+    document.getElementById("activityRangeHint").textContent =
+      `over the last ${stats.rangeDays} day${stats.rangeDays === 1 ? "" : "s"}`;
+    const ctxActivity = document.getElementById("activityChart").getContext("2d");
+    const activityGradient = ctxActivity.createLinearGradient(0, 0, 0, 260);
+    activityGradient.addColorStop(0, "rgba(139, 124, 246, 0.35)");
+    activityGradient.addColorStop(1, "rgba(139, 124, 246, 0)");
+    charts.activity = new Chart(ctxActivity, {
+      type: "line",
+      data: {
+        labels: activitySeries.map((p) => labelFmt(p.date)),
+        datasets: [{
+          label: "Cards reviewed",
+          data: activitySeries.map((p) => p.count),
+          borderColor: "#8b7cf6",
+          backgroundColor: activityGradient,
+          fill: true,
+          tension: 0.35,
+          pointRadius: activitySeries.length > 60 ? 0 : 2,
+          pointBackgroundColor: "#8b7cf6",
+          borderWidth: 2,
+        }],
+      },
+      options: {
+        responsive: true,
+        maintainAspectRatio: false,
+        plugins: { legend: { display: false } },
+        scales: {
+          x: { grid: { display: false }, ticks: { maxTicksLimit: 10 } },
+          y: { beginAtZero: true, grid: { color: "#1f232f" }, ticks: { precision: 0 } },
+        },
+      },
+    });
+
     // Pro conversion — donut
     destroyChart("conversion");
     const free = Math.max(0, stats.totalUsers - stats.proUsers);
@@ -469,7 +535,7 @@
         responsive: true,
         maintainAspectRatio: false,
         cutout: "72%",
-        plugins: { legend: { display: false } },
+        plugins: { legend: { display: false }, centerText: { text: conversionPct } },
       },
     });
     renderLegend("conversionLegend", [
@@ -507,7 +573,7 @@
     const langData = (stats.languageCounts || [])
       .filter((l) => l.count > 0)
       .sort((a, b) => b.count - a.count);
-    const languageWrap = document.getElementById("languageChart").parentElement;
+    const languageWrap = document.getElementById("languageChartWrap");
     if (langData.length === 0) {
       languageWrap.innerHTML = '<p style="color:var(--muted-2);font-size:13px;text-align:center;padding-top:80px;">No language selections synced yet.</p>';
     } else {
