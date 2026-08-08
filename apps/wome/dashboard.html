@@ -183,6 +183,7 @@
   @media (max-width: 860px) {
     .charts-grid { grid-template-columns: 1fr; }
   }
+  .charts-grid .full-width { grid-column: 1 / -1; }
 
   .legend-list { display: flex; flex-wrap: wrap; gap: 10px; margin-top: 14px; }
   .legend-item { display: flex; align-items: center; gap: 6px; font-size: 12px; color: var(--muted); }
@@ -266,12 +267,20 @@
 
     <div class="charts-grid">
       <section class="panel">
-        <h2>Meaning Language</h2>
-        <p class="panel-desc">Language users chose to see word meanings translated into.</p>
-        <div class="chart-wrap" id="languageChartWrap"><canvas id="languageChart"></canvas></div>
+        <h2>Daily Completions <span class="hint" id="completionRangeHint"></span></h2>
+        <p class="panel-desc">Sessions where a user hit their daily word goal and reached the "session complete" screen, per day.</p>
+        <div class="chart-wrap tall"><canvas id="completionChart"></canvas></div>
       </section>
 
       <section class="panel">
+        <h2>Meaning Language</h2>
+        <p class="panel-desc">Language users chose to see word meanings translated into. Only recorded starting Aug 2026 — existing users will show up here once they revisit onboarding or change it in Settings; older selections weren't saved and can't be backfilled.</p>
+        <div class="chart-wrap" id="languageChartWrap"><canvas id="languageChart"></canvas></div>
+      </section>
+    </div>
+
+    <div class="charts-grid">
+      <section class="panel full-width">
         <h2>Content</h2>
         <p class="panel-desc">AI-generated custom words: ready to study, still generating, and unique words cached for reuse across all users.</p>
         <div class="chart-wrap donut"><canvas id="contentChart"></canvas></div>
@@ -505,6 +514,34 @@
           pointRadius: activitySeries.length > 60 ? 0 : 2,
           pointBackgroundColor: "#8b7cf6",
           borderWidth: 2,
+        }],
+      },
+      options: {
+        responsive: true,
+        maintainAspectRatio: false,
+        plugins: { legend: { display: false } },
+        scales: {
+          x: { grid: { display: false }, ticks: { maxTicksLimit: 10 } },
+          y: { beginAtZero: true, grid: { color: "#1f232f" }, ticks: { precision: 0 } },
+        },
+      },
+    });
+
+    // Daily Completions — bar chart, sessions that hit the daily goal per day
+    destroyChart("completion");
+    const completionSeries = stats.completionSeries || [];
+    document.getElementById("completionRangeHint").textContent =
+      `over the last ${stats.rangeDays} day${stats.rangeDays === 1 ? "" : "s"}`;
+    charts.completion = new Chart(document.getElementById("completionChart"), {
+      type: "bar",
+      data: {
+        labels: completionSeries.map((p) => labelFmt(p.date)),
+        datasets: [{
+          label: "Goals completed",
+          data: completionSeries.map((p) => p.count),
+          backgroundColor: "#34d399",
+          borderRadius: 3,
+          maxBarThickness: 24,
         }],
       },
       options: {
