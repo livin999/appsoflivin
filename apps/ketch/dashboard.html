@@ -1,0 +1,515 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Ketch — Admin Dashboard</title>
+<meta name="robots" content="noindex, nofollow" />
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.7/dist/chart.umd.min.js" integrity="sha384-vsrfeLOOY6KuIYKDlmVH5UiBmgIdB1oEf7p01YgWHuqmOHfZr374+odEv96n9tNC" crossorigin="anonymous"></script>
+<style>
+  :root {
+    --coral: #FF6248;
+    --coral-soft: #ff8a76;
+    --violet: #8b7cf6;
+    --teal: #34d5c4;
+    --amber: #f5b942;
+    --bg: #0b0d12;
+    --bg-grad: radial-gradient(circle at 15% 0%, #1a1420 0%, #0b0d12 45%), radial-gradient(circle at 85% 15%, #131a24 0%, #0b0d12 50%);
+    --card: #161922;
+    --card-hover: #1a1e29;
+    --border: #262b38;
+    --text: #f2f3f5;
+    --muted: #9aa1ac;
+    --muted-2: #6b7280;
+    --good: #4ade80;
+    --bad: #ff6b6b;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+    background: var(--bg);
+    background-image: var(--bg-grad);
+    background-attachment: fixed;
+    color: var(--text);
+    -webkit-font-smoothing: antialiased;
+  }
+  header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    flex-wrap: wrap;
+    row-gap: 10px;
+    padding: 18px 28px;
+    border-bottom: 1px solid var(--border);
+    position: sticky;
+    top: 0;
+    background: rgba(11, 13, 18, 0.85);
+    backdrop-filter: blur(10px);
+    z-index: 10;
+  }
+  header .brand { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+  header .dot {
+    width: 9px; height: 9px; border-radius: 50%;
+    background: var(--good);
+    box-shadow: 0 0 8px var(--good);
+    flex-shrink: 0;
+  }
+  header h1 { font-size: 17px; margin: 0; font-weight: 700; letter-spacing: -0.01em; white-space: nowrap; }
+  header h1 span { color: var(--coral); }
+  header .subtitle { font-size: 12px; color: var(--muted-2); margin-left: 12px; }
+
+  .header-actions { display: flex; align-items: center; gap: 14px; margin-left: auto; }
+
+  @media (max-width: 560px) {
+    header .subtitle { display: none; }
+    .header-actions { width: 100%; justify-content: flex-end; margin-left: 0; }
+  }
+
+  #rangeSelect {
+    background: var(--card);
+    border: 1px solid var(--border);
+    color: var(--text);
+    padding: 8px 12px;
+    border-radius: 8px;
+    font-size: 13px;
+    cursor: pointer;
+    display: none;
+  }
+  #rangeSelect:focus { outline: 1px solid var(--coral); }
+
+  #signOutBtn {
+    background: transparent;
+    border: 1px solid var(--border);
+    color: var(--muted);
+    padding: 8px 14px;
+    border-radius: 8px;
+    cursor: pointer;
+    font-size: 13px;
+    display: none;
+  }
+  #signOutBtn:hover { border-color: var(--coral); color: var(--text); }
+
+  main { max-width: 1200px; margin: 0 auto; padding: 28px; }
+
+  #gate {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    min-height: 70vh;
+    text-align: center;
+    gap: 16px;
+  }
+  #gate p { color: var(--muted); max-width: 360px; }
+  #signInBtn {
+    background: linear-gradient(135deg, var(--coral), var(--coral-soft));
+    color: white;
+    border: none;
+    padding: 12px 24px;
+    border-radius: 10px;
+    font-size: 15px;
+    font-weight: 600;
+    cursor: pointer;
+    box-shadow: 0 8px 24px -8px rgba(255, 98, 72, 0.5);
+  }
+  #signInBtn:hover { opacity: 0.92; }
+  #deniedMsg { color: var(--bad); display: none; }
+
+  .grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(190px, 1fr));
+    gap: 14px;
+    margin-bottom: 24px;
+  }
+  .stat-card {
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-radius: 16px;
+    padding: 18px 20px;
+    position: relative;
+    overflow: hidden;
+    transition: transform 0.15s ease, border-color 0.15s ease;
+  }
+  .stat-card:hover { transform: translateY(-2px); border-color: #333a4a; }
+  .stat-card::before {
+    content: "";
+    position: absolute;
+    top: 0; left: 0; right: 0;
+    height: 2px;
+    background: var(--accent, var(--coral));
+  }
+  .stat-card .label {
+    font-size: 11px;
+    color: var(--muted);
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    margin-bottom: 10px;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+  }
+  .stat-card .value { font-size: 30px; font-weight: 700; letter-spacing: -0.02em; }
+  .stat-card .sub { font-size: 12px; color: var(--muted-2); margin-top: 6px; }
+
+  section.panel {
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-radius: 16px;
+    padding: 22px 24px;
+    margin-bottom: 18px;
+  }
+  section.panel h2 {
+    font-size: 13px;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    color: var(--muted);
+    margin: 0 0 18px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+  }
+  section.panel h2 .hint { font-size: 11px; color: var(--muted-2); text-transform: none; letter-spacing: 0; font-weight: 400; }
+  .panel-desc { font-size: 12px; color: var(--muted-2); margin: -10px 0 16px; line-height: 1.4; }
+
+  .chart-wrap { position: relative; height: 260px; }
+  .chart-wrap.tall { height: 300px; }
+  .chart-wrap.donut { height: 220px; }
+
+  .charts-grid {
+    display: grid;
+    grid-template-columns: repeat(2, 1fr);
+    gap: 18px;
+  }
+  @media (max-width: 860px) {
+    .charts-grid { grid-template-columns: 1fr; }
+  }
+  .charts-grid .full-width { grid-column: 1 / -1; }
+
+  #loadingMsg, #errorMsg { text-align: center; color: var(--muted); padding: 80px 0; }
+  #loadingMsg .spinner {
+    width: 28px; height: 28px; margin: 0 auto 16px;
+    border: 3px solid var(--border);
+    border-top-color: var(--coral);
+    border-radius: 50%;
+    animation: spin 0.8s linear infinite;
+  }
+  @keyframes spin { to { transform: rotate(360deg); } }
+  #errorMsg { color: var(--bad); display: none; }
+  #dashboardContent { display: none; }
+  footer { text-align: center; color: var(--muted-2); font-size: 12px; padding: 24px; }
+</style>
+</head>
+<body>
+
+<header>
+  <div class="brand">
+    <span class="dot"></span>
+    <h1>K<span>etch</span> — Admin Dashboard</h1>
+    <span class="subtitle" id="generatedAt"></span>
+  </div>
+  <div class="header-actions">
+    <select id="rangeSelect">
+      <option value="7">Last 7 days</option>
+      <option value="30" selected>Last 30 days</option>
+      <option value="90">Last 90 days</option>
+      <option value="365">Last 12 months</option>
+    </select>
+    <button id="signOutBtn">Sign out</button>
+  </div>
+</header>
+
+<main>
+  <div id="gate">
+    <p>Sign in with the Ketch owner Google account to view live usage metrics.</p>
+    <button id="signInBtn">Sign in with Google</button>
+    <p id="deniedMsg">That account isn't authorized to view this dashboard.</p>
+  </div>
+
+  <div id="loadingMsg" style="display:none;"><div class="spinner"></div>Loading stats…</div>
+  <div id="errorMsg"></div>
+
+  <div id="dashboardContent">
+    <div class="grid" id="statGrid"></div>
+
+    <div class="charts-grid">
+      <section class="panel">
+        <h2>Signups <span class="hint" id="signupRangeHint"></span></h2>
+        <p class="panel-desc">New user accounts created each day, from Firestore.</p>
+        <div class="chart-wrap tall"><canvas id="signupChart"></canvas></div>
+      </section>
+
+      <section class="panel">
+        <h2>Waves Sent <span class="hint" id="waveRangeHint"></span></h2>
+        <p class="panel-desc">Waves sent each day, summed across all users (includes wave-backs).</p>
+        <div class="chart-wrap tall"><canvas id="waveChart"></canvas></div>
+      </section>
+    </div>
+
+    <div class="charts-grid">
+      <section class="panel full-width">
+        <h2>Circles by Check-in Period</h2>
+        <p class="panel-desc">Circles (levels) grouped by how often the user wants to check in with contacts placed there.</p>
+        <div class="chart-wrap"><canvas id="periodChart"></canvas></div>
+      </section>
+    </div>
+  </div>
+</main>
+
+<footer>Ketch internal metrics — data refreshes on sign-in and range change</footer>
+
+<script type="module">
+  import { initializeApp } from "https://www.gstatic.com/firebasejs/11.4.0/firebase-app.js";
+  import {
+    getAuth,
+    GoogleAuthProvider,
+    signInWithPopup,
+    signOut,
+    onAuthStateChanged,
+  } from "https://www.gstatic.com/firebasejs/11.4.0/firebase-auth.js";
+  import {
+    getFunctions,
+    httpsCallable,
+  } from "https://www.gstatic.com/firebasejs/11.4.0/firebase-functions.js";
+
+  const firebaseConfig = {
+    projectId: "ketch-app",
+    appId: "1:976620079365:web:0f437db897d5cf8613cf6c",
+    storageBucket: "ketch-app.firebasestorage.app",
+    apiKey: "AIzaSyAsIzRim2yfvE6LXE1U5F4anyjvzmUJ8e0",
+    authDomain: "ketch-app.firebaseapp.com",
+    messagingSenderId: "976620079365",
+  };
+
+  const app = initializeApp(firebaseConfig);
+  const auth = getAuth(app);
+  const functions = getFunctions(app, "us-central1");
+
+  const gate = document.getElementById("gate");
+  const signInBtn = document.getElementById("signInBtn");
+  const signOutBtn = document.getElementById("signOutBtn");
+  const deniedMsg = document.getElementById("deniedMsg");
+  const loadingMsg = document.getElementById("loadingMsg");
+  const errorMsg = document.getElementById("errorMsg");
+  const dashboardContent = document.getElementById("dashboardContent");
+  const rangeSelect = document.getElementById("rangeSelect");
+
+  let charts = {};
+  let currentUser = null;
+  let loadStatsSeq = 0;
+
+  signInBtn.addEventListener("click", async () => {
+    deniedMsg.style.display = "none";
+    try {
+      await signInWithPopup(auth, new GoogleAuthProvider());
+    } catch (e) {
+      console.error(e);
+    }
+  });
+
+  signOutBtn.addEventListener("click", () => signOut(auth));
+  rangeSelect.addEventListener("change", () => loadStats());
+
+  onAuthStateChanged(auth, async (user) => {
+    currentUser = user;
+    if (!user) {
+      gate.style.display = "flex";
+      signOutBtn.style.display = "none";
+      rangeSelect.style.display = "none";
+      dashboardContent.style.display = "none";
+      loadingMsg.style.display = "none";
+      return;
+    }
+
+    signOutBtn.style.display = "inline-block";
+    rangeSelect.style.display = "inline-block";
+    gate.style.display = "none";
+    await loadStats();
+  });
+
+  async function loadStats() {
+    const seq = ++loadStatsSeq;
+    loadingMsg.style.display = "block";
+    dashboardContent.style.display = "none";
+    errorMsg.style.display = "none";
+
+    try {
+      const getAdminStats = httpsCallable(functions, "getAdminStats");
+      const result = await getAdminStats({ rangeDays: Number(rangeSelect.value) });
+      if (seq !== loadStatsSeq) return; // a newer range change superseded this request
+      renderStats(result.data);
+      loadingMsg.style.display = "none";
+      dashboardContent.style.display = "block";
+    } catch (e) {
+      if (seq !== loadStatsSeq) return;
+      loadingMsg.style.display = "none";
+      if (e && e.code === "functions/permission-denied") {
+        await signOut(auth);
+        gate.style.display = "flex";
+        deniedMsg.style.display = "block";
+      } else {
+        errorMsg.textContent = "Failed to load stats: " + (e?.message || e);
+        errorMsg.style.display = "block";
+      }
+    }
+  }
+
+  const PERIOD_LABELS = {
+    daily: "Daily",
+    weekly: "Weekly",
+    monthly: "Monthly",
+    quarterly: "Quarterly",
+    half_yearly: "Half-yearly",
+    yearly: "Yearly",
+  };
+
+  const PALETTE = ["#FF6248", "#8b7cf6", "#34d5c4", "#f5b942", "#4ade80", "#60a5fa", "#f472b6", "#facc15", "#a78bfa", "#2dd4bf", "#fb923c", "#e879f9"];
+
+  Chart.defaults.color = "#9aa1ac";
+  Chart.defaults.font.family = "-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif";
+  Chart.defaults.font.size = 12;
+
+  function statCard(label, value, sub, accent) {
+    const div = document.createElement("div");
+    div.className = "stat-card";
+    if (accent) div.style.setProperty("--accent", accent);
+    div.innerHTML = `<div class="label">${label}</div><div class="value">${value}</div>${sub ? `<div class="sub">${sub}</div>` : ""}`;
+    return div;
+  }
+
+  function destroyChart(key) {
+    if (charts[key]) {
+      charts[key].destroy();
+      delete charts[key];
+    }
+  }
+
+  function renderStats(stats) {
+    const grid = document.getElementById("statGrid");
+    grid.innerHTML = "";
+
+    const avgContacts = stats.totalUsers > 0
+      ? (stats.totalContacts / stats.totalUsers).toFixed(1)
+      : "—";
+
+    grid.appendChild(statCard("Total Users", stats.totalUsers, null, "#FF6248"));
+    grid.appendChild(statCard("Total Contacts", stats.totalContacts, "added across all circles", "#8b7cf6"));
+    grid.appendChild(statCard("Total Circles", stats.totalLevels, null, "#34d5c4"));
+    grid.appendChild(statCard("Total Waves Sent", stats.totalWaves, null, "#f5b942"));
+    grid.appendChild(statCard("Signups (7d)", stats.signups?.last7d ?? 0, null, "#60a5fa"));
+    grid.appendChild(statCard("Signups (30d)", stats.signups?.last30d ?? 0, null, "#f472b6"));
+    grid.appendChild(statCard("Avg Contacts / User", avgContacts, "engagement depth", "#4ade80"));
+
+    const labelFmt = (iso) => {
+      const d = new Date(iso + "T00:00:00Z");
+      return stats.rangeDays > 90
+        ? d.toLocaleDateString(undefined, { month: "short", year: "2-digit" })
+        : d.toLocaleDateString(undefined, { month: "short", day: "numeric" });
+    };
+
+    document.getElementById("signupRangeHint").textContent =
+      `over the last ${stats.rangeDays} day${stats.rangeDays === 1 ? "" : "s"}`;
+
+    // Signups over time — line chart
+    destroyChart("signup");
+    const series = stats.signupSeries || [];
+    const ctxSignup = document.getElementById("signupChart").getContext("2d");
+    const gradient = ctxSignup.createLinearGradient(0, 0, 0, 260);
+    gradient.addColorStop(0, "rgba(255, 98, 72, 0.35)");
+    gradient.addColorStop(1, "rgba(255, 98, 72, 0)");
+    charts.signup = new Chart(ctxSignup, {
+      type: "line",
+      data: {
+        labels: series.map((p) => labelFmt(p.date)),
+        datasets: [{
+          label: "Signups",
+          data: series.map((p) => p.count),
+          borderColor: "#FF6248",
+          backgroundColor: gradient,
+          fill: true,
+          tension: 0.35,
+          pointRadius: series.length > 60 ? 0 : 2,
+          pointBackgroundColor: "#FF6248",
+          borderWidth: 2,
+        }],
+      },
+      options: {
+        responsive: true,
+        maintainAspectRatio: false,
+        plugins: { legend: { display: false } },
+        scales: {
+          x: { grid: { display: false }, ticks: { maxTicksLimit: 10 } },
+          y: { beginAtZero: true, grid: { color: "#1f232f" }, ticks: { precision: 0 } },
+        },
+      },
+    });
+
+    // Waves sent over time — line chart
+    destroyChart("wave");
+    const waveSeries = stats.waveSeries || [];
+    document.getElementById("waveRangeHint").textContent =
+      `over the last ${stats.rangeDays} day${stats.rangeDays === 1 ? "" : "s"}`;
+    const ctxWave = document.getElementById("waveChart").getContext("2d");
+    const waveGradient = ctxWave.createLinearGradient(0, 0, 0, 260);
+    waveGradient.addColorStop(0, "rgba(139, 124, 246, 0.35)");
+    waveGradient.addColorStop(1, "rgba(139, 124, 246, 0)");
+    charts.wave = new Chart(ctxWave, {
+      type: "line",
+      data: {
+        labels: waveSeries.map((p) => labelFmt(p.date)),
+        datasets: [{
+          label: "Waves sent",
+          data: waveSeries.map((p) => p.count),
+          borderColor: "#8b7cf6",
+          backgroundColor: waveGradient,
+          fill: true,
+          tension: 0.35,
+          pointRadius: waveSeries.length > 60 ? 0 : 2,
+          pointBackgroundColor: "#8b7cf6",
+          borderWidth: 2,
+        }],
+      },
+      options: {
+        responsive: true,
+        maintainAspectRatio: false,
+        plugins: { legend: { display: false } },
+        scales: {
+          x: { grid: { display: false }, ticks: { maxTicksLimit: 10 } },
+          y: { beginAtZero: true, grid: { color: "#1f232f" }, ticks: { precision: 0 } },
+        },
+      },
+    });
+
+    // Circles by check-in period — horizontal bar
+    destroyChart("period");
+    const periodData = stats.periodCounts || [];
+    charts.period = new Chart(document.getElementById("periodChart"), {
+      type: "bar",
+      data: {
+        labels: periodData.map((p) => PERIOD_LABELS[p.period] ?? p.period),
+        datasets: [{
+          data: periodData.map((p) => p.count),
+          backgroundColor: periodData.map((_, i) => PALETTE[i % PALETTE.length]),
+          borderRadius: 6,
+          maxBarThickness: 34,
+        }],
+      },
+      options: {
+        responsive: true,
+        maintainAspectRatio: false,
+        indexAxis: "y",
+        plugins: { legend: { display: false } },
+        scales: {
+          x: { beginAtZero: true, grid: { color: "#1f232f" }, ticks: { precision: 0 } },
+          y: { grid: { display: false } },
+        },
+      },
+    });
+
+    document.getElementById("generatedAt").textContent =
+      "Updated " + new Date(stats.generatedAt).toLocaleTimeString();
+  }
+
+</script>
+</body>
+</html>
