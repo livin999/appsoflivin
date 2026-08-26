@@ -318,6 +318,10 @@
       await signInWithPopup(auth, new GoogleAuthProvider());
     } catch (e) {
       console.error(e);
+      if (e?.code !== "auth/popup-closed-by-user" && e?.code !== "auth/cancelled-popup-request") {
+        deniedMsg.textContent = `Sign-in failed: ${e?.message || e}`;
+        deniedMsg.style.display = "block";
+      }
     }
   });
 
@@ -402,8 +406,13 @@
       ? ((stats.cloudBackups / stats.totalUsers) * 100).toFixed(1) + "%"
       : "—";
 
+    const proPct = stats.totalUsers > 0
+      ? ((stats.proConversions / stats.totalUsers) * 100).toFixed(1) + "%"
+      : "—";
+
     grid.appendChild(statCard("Total Users", stats.totalUsers, null, "#4F46E5"));
     grid.appendChild(statCard("Cloud Backups", stats.cloudBackups, `${backupPct} of users`, "#8B5CF6"));
+    grid.appendChild(statCard("Pro Conversions", stats.proConversions ?? 0, `${proPct} of users (self-reported)`, "#EAB308"));
     grid.appendChild(statCard("Custom Sentences Ready", stats.customSentencesReady, null, "#14B8A6"));
     grid.appendChild(statCard("Custom Sentences Pending", stats.customSentencesPending, null, "#F59E0B"));
     grid.appendChild(statCard("Unique Sentences Cached", stats.uniqueSentencesCached, "shared across all users", "#16A34A"));
