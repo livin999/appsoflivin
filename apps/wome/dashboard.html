@@ -182,6 +182,12 @@
   .legend-item { display: flex; align-items: center; gap: 6px; font-size: 12px; color: var(--muted); }
   .legend-swatch { width: 10px; height: 10px; border-radius: 3px; flex-shrink: 0; }
 
+  .report-table { width: 100%; border-collapse: collapse; font-size: 13px; }
+  .report-table th { text-align: left; color: var(--muted-2); font-weight: 500; font-size: 11px; text-transform: uppercase; letter-spacing: 0.05em; padding: 0 10px 8px 0; }
+  .report-table td { padding: 8px 10px 8px 0; border-top: 1px solid var(--border); vertical-align: top; }
+  .report-table td.num { color: var(--coral); font-weight: 700; white-space: nowrap; }
+  .report-table td.muted { color: var(--muted); }
+  .empty-note { color: var(--muted-2); font-size: 13px; text-align: center; padding: 24px 0; }
   #loadingMsg, #errorMsg { text-align: center; color: var(--muted); padding: 80px 0; }
   #loadingMsg .spinner {
     width: 28px; height: 28px; margin: 0 auto 16px;
@@ -277,6 +283,25 @@
         <p class="panel-desc">AI-generated custom words: ready to study, still generating, and unique words cached for reuse across all users.</p>
         <div class="chart-wrap donut"><canvas id="contentChart"></canvas></div>
         <div class="legend-list" id="contentLegend"></div>
+      </section>
+    </div>
+
+    <div class="charts-grid">
+      <section class="panel">
+        <h2>Word Reports <span class="hint">last 12 months</span></h2>
+        <p class="panel-desc">Times users tapped "Report this meaning" on a custom word, per month. Review these monthly and fix or purge bad meanings.</p>
+        <div class="chart-wrap"><canvas id="reportChart"></canvas></div>
+      </section>
+
+      <section class="panel">
+        <h2>Most Reported Words</h2>
+        <p class="panel-desc">Words reported most often, with the meaning as it was last reported.</p>
+        <div id="reportTopWords"></div>
+      </section>
+
+      <section class="panel full-width">
+        <h2>Latest Reports</h2>
+        <div id="reportRecent"></div>
       </section>
     </div>
   </div>
@@ -437,6 +462,7 @@
     grid.appendChild(statCard("Custom Words Ready", stats.customWordsReady, null, "#34d5c4"));
     grid.appendChild(statCard("Custom Words Pending", stats.customWordsPending, null, "#f5b942"));
     grid.appendChild(statCard("Unique AI Words Cached", stats.communityWordsUnique, "shared across all users", "#4ade80"));
+    grid.appendChild(statCard("Word Reports (12 mo)", stats.meaningReports?.total ?? 0, "wrong-meaning reports", "#fb923c"));
     grid.appendChild(statCard("Signups (7d)", stats.signups?.last7d ?? 0, null, "#60a5fa"));
     grid.appendChild(statCard("Signups (30d)", stats.signups?.last30d ?? 0, null, "#f472b6"));
 
@@ -658,8 +684,84 @@
       { label: `Cached — ${stats.communityWordsUnique}`, color: "#4ade80" },
     ]);
 
+    renderMeaningReports(stats.meaningReports);
+
     document.getElementById("generatedAt").textContent =
       "Updated " + new Date(stats.generatedAt).toLocaleTimeString();
+  }
+
+  function reportTable(el, headers, rows, colClasses) {
+    el.textContent = "";
+    if (rows.length === 0) {
+      const p = document.createElement("p");
+      p.className = "empty-note";
+      p.textContent = "No reports yet.";
+      el.appendChild(p);
+      return;
+    }
+    const table = document.createElement("table");
+    table.className = "report-table";
+    const head = table.createTHead().insertRow();
+    for (const h of headers) {
+      const th = document.createElement("th");
+      th.textContent = h;
+      head.appendChild(th);
+    }
+    const body = table.createTBody();
+    for (const row of rows) {
+      const tr = body.insertRow();
+      row.forEach((cell, i) => {
+        const td = tr.insertCell();
+        td.textContent = cell;
+        td.className = colClasses[i] || "";
+      });
+    }
+    el.appendChild(table);
+  }
+
+  function renderMeaningReports(reports) {
+    const r = reports || { total: 0, monthly: [], topWords: [], recent: [] };
+
+    destroyChart("report");
+    charts.report = new Chart(document.getElementById("reportChart"), {
+      type: "bar",
+      data: {
+        labels: r.monthly.map((m) => {
+          const d = new Date(m.month + "-01T00:00:00Z");
+          return d.toLocaleDateString(undefined, { month: "short", year: "2-digit", timeZone: "UTC" });
+        }),
+        datasets: [{
+          label: "Reports",
+          data: r.monthly.map((m) => m.count),
+          backgroundColor: "#f5b942",
+          borderRadius: 3,
+          maxBarThickness: 24,
+        }],
+      },
+      options: {
+        responsive: true,
+        maintainAspectRatio: false,
+        plugins: { legend: { display: false } },
+        scales: {
+          x: { grid: { display: false } },
+          y: { beginAtZero: true, grid: { color: "#1f232f" }, ticks: { precision: 0 } },
+        },
+      },
+    });
+
+    const fmtDate = (iso) => new Date(iso).toLocaleDateString(undefined, { month: "short", day: "numeric", year: "numeric" });
+    reportTable(
+      document.getElementById("reportTopWords"),
+      ["Reports", "Word", "Last meaning"],
+      r.topWords.map((w) => [String(w.count), w.headword, w.meaning]),
+      ["num", "", "muted"],
+    );
+    reportTable(
+      document.getElementById("reportRecent"),
+      ["Date", "Word", "Meaning"],
+      r.recent.map((w) => [fmtDate(w.date), w.headword, w.meaning]),
+      ["muted", "", "muted"],
+    );
   }
 
   function renderLegend(elId, items) {
