@@ -199,6 +199,16 @@
   @keyframes spin { to { transform: rotate(360deg); } }
   #errorMsg { color: var(--bad); display: none; }
   #dashboardContent { display: none; }
+  .metrics-heading { font-size: 15px; margin: 32px 0 6px; font-weight: 700; }
+  .metrics-sub { color: var(--muted-2); font-size: 12px; margin: 0 0 14px; }
+  .cohort-cell { display: inline-block; padding: 3px 8px; border-radius: 6px; min-width: 88px; text-align: center; }
+  .cohort-cell.tiny { opacity: 0.7; }
+  .report-table td.c, .report-table th.c { text-align: center; }
+  .bar-row { display: grid; grid-template-columns: 90px 1fr 36px; gap: 8px; align-items: center; margin: 7px 0; font-size: 13px; color: var(--muted); }
+  .bar-row .track { height: 12px; background: #1d212c; border-radius: 6px; overflow: hidden; }
+  .bar-row .track i { display: block; height: 100%; background: var(--teal); }
+  .bar-row .n { text-align: right; color: var(--text); font-variant-numeric: tabular-nums; }
+  .note-line { color: var(--muted-2); font-size: 12px; margin: 10px 0 0; line-height: 1.45; }
   footer { text-align: center; color: var(--muted-2); font-size: 12px; padding: 24px; }
 </style>
 </head>
@@ -304,6 +314,28 @@
         <div id="reportRecent"></div>
       </section>
     </div>
+
+    <div id="investorMetrics" style="display:none;">
+      <h2 class="metrics-heading">Engagement</h2>
+      <p class="metrics-sub" id="engagementAsOf"></p>
+      <div class="grid" id="engagementGrid"></div>
+      <section class="panel">
+        <h2>Current streak <span class="hint">learners active in the last 7 days</span></h2>
+        <p class="panel-desc">Grouped by how many days in a row they have studied up to the snapshot.</p>
+        <div id="streakBars"></div>
+      </section>
+
+      <h2 class="metrics-heading">Retention by signup week</h2>
+      <section class="panel">
+        <p class="panel-desc" style="margin-top:0;">Each cell is returned / eligible accounts for learners who joined that week, active exactly on day 1, 7 or 30. Only accounts old enough for that day are counted, and weeks with fewer than 5 signups are hidden. Faded cells have fewer than 5 eligible accounts.</p>
+        <div id="retentionTable" style="overflow-x:auto;"></div>
+      </section>
+
+      <h2 class="metrics-heading">Revenue</h2>
+      <p class="metrics-sub" id="revenueAsOf"></p>
+      <div class="grid" id="revenueGrid"></div>
+      <p class="note-line" id="revenueNote"></p>
+    </div>
   </div>
 </main>
 
@@ -386,9 +418,15 @@
 
     try {
       const getAdminStats = httpsCallable(functions, "getAdminStats");
-      const result = await getAdminStats({ rangeDays: Number(rangeSelect.value) });
+      const getAdminMetrics = httpsCallable(functions, "getAdminMetrics");
+      const [result, metrics] = await Promise.all([
+        getAdminStats({ rangeDays: Number(rangeSelect.value) }),
+        // The investor panels are additive: a metrics failure must not hide the core stats.
+        getAdminMetrics({}).catch((e) => { console.error(e); return null; }),
+      ]);
       if (seq !== loadStatsSeq) return; // a newer range change superseded this request
       renderStats(result.data);
+      renderInvestorMetrics(metrics ? metrics.data : null);
       loadingMsg.style.display = "none";
       dashboardContent.style.display = "block";
     } catch (e) {
@@ -446,6 +484,147 @@
     if (charts[key]) {
       charts[key].destroy();
       delete charts[key];
+    }
+  }
+
+  const RETENTION_TINY_COHORT = 5;
+  const RETENTION_HEAT_CAP = 0.5;
+  const RETENTION_HEAT_BASE = 0.06;
+  const RETENTION_HEAT_SCALE = 0.5;
+  const PERCENT = 100;
+
+  const fmtInr = (n) => "₹" + Math.round(n).toLocaleString("en-IN");
+  const fmtInrOrDash = (n) => (n === null || n === undefined ? "—" : fmtInr(n));
+  const fmtPctOrDash = (n) => (n === null || n === undefined ? "—" : n + "%");
+  const fmtNumOrDash = (n) => (n === null || n === undefined ? "—" : String(n));
+  const fmtDay = (iso) => new Date(iso + "T00:00:00Z")
+    .toLocaleDateString(undefined, { day: "numeric", month: "short", year: "numeric", timeZone: "UTC" });
+  const fmtWeek = (iso) => new Date(iso + "T00:00:00Z")
+    .toLocaleDateString(undefined, { day: "numeric", month: "short", timeZone: "UTC" });
+  const streakLabel = (days) => (days === 1 ? "1+ day" : days + "+ days");
+
+  function retentionCell(point) {
+    const td = document.createElement("td");
+    td.className = "c";
+    if (!point || point.eligible === 0) {
+      td.classList.add("muted");
+      td.textContent = "—";
+      return td;
+    }
+    const ratio = point.retained / point.eligible;
+    const alpha = (RETENTION_HEAT_BASE + Math.min(ratio, RETENTION_HEAT_CAP) * RETENTION_HEAT_SCALE).toFixed(2);
+    const span = document.createElement("span");
+    span.className = "cohort-cell" + (point.eligible < RETENTION_TINY_COHORT ? " tiny" : "");
+    span.style.background = "rgba(242,243,245," + alpha + ")";
+    span.textContent = point.retained + "/" + point.eligible + " · " + point.pct + "%";
+    if (point.eligible < RETENTION_TINY_COHORT) {
+      span.title = "Fewer than 5 eligible accounts: read as counts, not a rate";
+    }
+    td.appendChild(span);
+    return td;
+  }
+
+  function emptyNote(el, text) {
+    const p = document.createElement("p");
+    p.className = "empty-note";
+    p.textContent = text;
+    el.appendChild(p);
+  }
+
+  function renderRetention(retention) {
+    const el = document.getElementById("retentionTable");
+    el.textContent = "";
+    if (!retention || retention.length === 0) {
+      emptyNote(el, "No signup week has 5 or more accounts yet.");
+      return;
+    }
+    const table = document.createElement("table");
+    table.className = "report-table";
+    const head = table.createTHead().insertRow();
+    ["Signed up (week of)", "Accounts", "Day 1", "Day 7", "Day 30"].forEach((h, i) => {
+      const th = document.createElement("th");
+      th.textContent = h;
+      if (i > 0) th.className = "c";
+      head.appendChild(th);
+    });
+    const body = table.createTBody();
+    for (const week of retention) {
+      const tr = body.insertRow();
+      tr.insertCell().textContent = fmtWeek(week.weekStart);
+      const size = tr.insertCell();
+      size.className = "c";
+      size.textContent = String(week.size);
+      for (const point of [week.d1, week.d7, week.d30]) tr.appendChild(retentionCell(point));
+    }
+    el.appendChild(table);
+  }
+
+  function renderStreaks(streaks, active) {
+    const el = document.getElementById("streakBars");
+    el.textContent = "";
+    if (!streaks || active === 0) {
+      emptyNote(el, "No learners active in the last 7 days.");
+      return;
+    }
+    for (const bucket of streaks) {
+      const row = document.createElement("div");
+      row.className = "bar-row";
+      const label = document.createElement("span");
+      label.textContent = streakLabel(bucket.atLeastDays);
+      const track = document.createElement("div");
+      track.className = "track";
+      const fill = document.createElement("i");
+      fill.style.width = ((bucket.count / active) * PERCENT).toFixed(0) + "%";
+      track.appendChild(fill);
+      const n = document.createElement("span");
+      n.className = "n";
+      n.textContent = String(bucket.count);
+      row.append(label, track, n);
+      el.appendChild(row);
+    }
+  }
+
+  function renderInvestorMetrics(metrics) {
+    const wrap = document.getElementById("investorMetrics");
+    const insights = metrics && metrics.insights;
+    const revenue = metrics && metrics.revenue;
+    if (!insights && !revenue) {
+      wrap.style.display = "none";
+      return;
+    }
+    wrap.style.display = "block";
+    const asOf = metrics.funnelAsOf ? "Snapshot of " + fmtDay(metrics.funnelAsOf) + " (IST). Test accounts excluded." : "";
+
+    const eng = insights && insights.engagement;
+    const engGrid = document.getElementById("engagementGrid");
+    engGrid.innerHTML = "";
+    document.getElementById("engagementAsOf").textContent = asOf;
+    if (eng) {
+      engGrid.appendChild(statCard("Active today", eng.dau, "of " + eng.mau + " active this month", "#34d5c4"));
+      engGrid.appendChild(statCard("Stickiness", fmtPctOrDash(eng.stickinessPct), "daily ÷ monthly active", "#8b7cf6"));
+      engGrid.appendChild(statCard("Active, 7 days", eng.activeLast7Days, null, "#60a5fa"));
+      engGrid.appendChild(statCard("Cards / active day", fmtNumOrDash(eng.cardsPerActiveDay), "last 7 days", "#FF6248"));
+      engGrid.appendChild(statCard("Days / week", fmtNumOrDash(eng.activeDaysPerWeek), "per active learner", "#f5b942"));
+      engGrid.appendChild(statCard("Churned", eng.churned, "active in 30 days, not in 7", "#ff6b6b"));
+      engGrid.appendChild(statCard("Returning", eng.resurrected, "back after 23+ quiet days", "#4ade80"));
+    }
+    renderStreaks(eng && eng.streaks, eng ? eng.activeLast7Days : 0);
+    renderRetention(insights && insights.retention);
+
+    const revGrid = document.getElementById("revenueGrid");
+    revGrid.innerHTML = "";
+    document.getElementById("revenueAsOf").textContent = asOf;
+    const note = document.getElementById("revenueNote");
+    if (revenue) {
+      revGrid.appendChild(statCard("Pro subscribers", revenue.proSubscribers, revenue.priced + " with a recorded price", "#8b7cf6"));
+      revGrid.appendChild(statCard("Conversion", fmtPctOrDash(revenue.conversionPct), "of accounts", "#FF6248"));
+      revGrid.appendChild(statCard("MRR (est.)", fmtInr(revenue.mrrInr), "monthly, gross", "#4ade80"));
+      revGrid.appendChild(statCard("ARPPU", fmtInrOrDash(revenue.arppuInr), "per paying subscriber", "#34d5c4"));
+      revGrid.appendChild(statCard("ARPU", fmtInrOrDash(revenue.arpuInr), "per account", "#f5b942"));
+      const rates = revenue.ratesAsOf ? " Exchange rates as of " + revenue.ratesAsOf + "." : "";
+      note.textContent = "Estimated and gross: before Google's fee and tax. Each subscriber is counted at the price Play recorded for their country, converted to INR; unpriced subscribers use the India list price of " + fmtInr(revenue.fallbackPriceInr) + "." + rates;
+    } else {
+      note.textContent = "";
     }
   }
 
