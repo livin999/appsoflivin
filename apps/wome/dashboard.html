@@ -13,16 +13,16 @@
     --violet: #8b7cf6;
     --teal: #34d5c4;
     --amber: #f5b942;
-    --bg: #0b0d12;
-    --bg-grad: radial-gradient(circle at 15% 0%, #1a1420 0%, #0b0d12 45%), radial-gradient(circle at 85% 15%, #131a24 0%, #0b0d12 50%);
-    --card: #161922;
-    --card-hover: #1a1e29;
-    --border: #262b38;
-    --text: #f2f3f5;
-    --muted: #9aa1ac;
-    --muted-2: #6b7280;
-    --good: #4ade80;
-    --bad: #ff6b6b;
+    --bg: #FFFBF5;
+    --bg-grad: radial-gradient(circle at 15% 0%, #FFF0E8 0%, #FFFBF5 45%), radial-gradient(circle at 85% 15%, #F3F1FF 0%, #FFFBF5 50%);
+    --card: #FFFFFF;
+    --card-hover: #FFF7F0;
+    --border: #EADFD3;
+    --text: #2D2D2D;
+    --muted: #5F5F5F;
+    --muted-2: #6B6B6B;
+    --good: #2E7D32;
+    --bad: #D32F2F;
   }
   * { box-sizing: border-box; }
   body {
@@ -42,7 +42,7 @@
     border-bottom: 1px solid var(--border);
     position: sticky;
     top: 0;
-    background: rgba(11, 13, 18, 0.85);
+    background: rgba(255, 251, 245, 0.88);
     backdrop-filter: blur(10px);
     z-index: 10;
   }
@@ -123,7 +123,7 @@
     overflow: hidden;
     transition: transform 0.15s ease, border-color 0.15s ease;
   }
-  .stat-card:hover { transform: translateY(-2px); border-color: #333a4a; }
+  .stat-card:hover { transform: translateY(-2px); border-color: #D9C9B8; box-shadow: 0 6px 18px -10px rgba(45, 45, 45, 0.25); }
   .stat-card::before {
     content: "";
     position: absolute;
@@ -205,7 +205,7 @@
   .cohort-cell.tiny { opacity: 0.7; }
   .report-table td.c, .report-table th.c { text-align: center; }
   .bar-row { display: grid; grid-template-columns: 90px 1fr 36px; gap: 8px; align-items: center; margin: 7px 0; font-size: 13px; color: var(--muted); }
-  .bar-row .track { height: 12px; background: #1d212c; border-radius: 6px; overflow: hidden; }
+  .bar-row .track { height: 12px; background: #F0E8E0; border-radius: 6px; overflow: hidden; }
   .bar-row .track i { display: block; height: 100%; background: var(--teal); }
   .bar-row .n { text-align: right; color: var(--text); font-variant-numeric: tabular-nums; }
   .note-line { color: var(--muted-2); font-size: 12px; margin: 10px 0 0; line-height: 1.45; }
@@ -450,7 +450,7 @@
 
   const PALETTE = ["#FF6248", "#8b7cf6", "#34d5c4", "#f5b942", "#4ade80", "#60a5fa", "#f472b6", "#facc15", "#a78bfa", "#2dd4bf", "#fb923c", "#e879f9"];
 
-  Chart.defaults.color = "#9aa1ac";
+  Chart.defaults.color = "#5F5F5F";
   Chart.defaults.font.family = "-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif";
   Chart.defaults.font.size = 12;
 
@@ -464,7 +464,7 @@
       const { ctx, chartArea: { width, height, left, top } } = chart;
       ctx.save();
       ctx.font = "700 24px -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif";
-      ctx.fillStyle = "#f2f3f5";
+      ctx.fillStyle = "#2D2D2D";
       ctx.textAlign = "center";
       ctx.textBaseline = "middle";
       ctx.fillText(opts.text, left + width / 2, top + height / 2);
@@ -515,7 +515,7 @@
     const alpha = (RETENTION_HEAT_BASE + Math.min(ratio, RETENTION_HEAT_CAP) * RETENTION_HEAT_SCALE).toFixed(2);
     const span = document.createElement("span");
     span.className = "cohort-cell" + (point.eligible < RETENTION_TINY_COHORT ? " tiny" : "");
-    span.style.background = "rgba(242,243,245," + alpha + ")";
+    span.style.background = "rgba(255,98,72," + alpha + ")";
     span.textContent = point.retained + "/" + point.eligible + " · " + point.pct + "%";
     if (point.eligible < RETENTION_TINY_COHORT) {
       span.title = "Fewer than 5 eligible accounts: read as counts, not a rate";
@@ -683,7 +683,7 @@
         plugins: { legend: { display: false } },
         scales: {
           x: { grid: { display: false }, ticks: { maxTicksLimit: 10 } },
-          y: { beginAtZero: true, grid: { color: "#1f232f" }, ticks: { precision: 0 } },
+          y: { beginAtZero: true, grid: { color: "#EFE6DC" }, ticks: { precision: 0 } },
         },
       },
     });
@@ -719,7 +719,7 @@
         plugins: { legend: { display: false } },
         scales: {
           x: { grid: { display: false }, ticks: { maxTicksLimit: 10 } },
-          y: { beginAtZero: true, grid: { color: "#1f232f" }, ticks: { precision: 0 } },
+          y: { beginAtZero: true, grid: { color: "#EFE6DC" }, ticks: { precision: 0 } },
         },
       },
     });
@@ -747,7 +747,7 @@
         plugins: { legend: { display: false } },
         scales: {
           x: { grid: { display: false }, ticks: { maxTicksLimit: 10 } },
-          y: { beginAtZero: true, grid: { color: "#1f232f" }, ticks: { precision: 0 } },
+          y: { beginAtZero: true, grid: { color: "#EFE6DC" }, ticks: { precision: 0 } },
         },
       },
     });
@@ -761,7 +761,7 @@
         labels: ["Pro", "Free"],
         datasets: [{
           data: [stats.proUsers, free],
-          backgroundColor: ["#FF6248", "#262b38"],
+          backgroundColor: ["#FF6248", "#E8DED3"],
           borderWidth: 0,
         }],
       },
@@ -774,7 +774,7 @@
     });
     renderLegend("conversionLegend", [
       { label: `Pro — ${stats.proUsers}`, color: "#FF6248" },
-      { label: `Free — ${free}`, color: "#262b38" },
+      { label: `Free — ${free}`, color: "#E8DED3" },
     ]);
 
     // Users by level — bar
@@ -796,7 +796,7 @@
         indexAxis: "y",
         plugins: { legend: { display: false } },
         scales: {
-          x: { beginAtZero: true, grid: { color: "#1f232f" }, ticks: { precision: 0 } },
+          x: { beginAtZero: true, grid: { color: "#EFE6DC" }, ticks: { precision: 0 } },
           y: { grid: { display: false } },
         },
       },
@@ -831,7 +831,7 @@
           indexAxis: "y",
           plugins: { legend: { display: false } },
           scales: {
-            x: { beginAtZero: true, grid: { color: "#1f232f" }, ticks: { precision: 0 } },
+            x: { beginAtZero: true, grid: { color: "#EFE6DC" }, ticks: { precision: 0 } },
             y: { grid: { display: false } },
           },
         },
@@ -923,7 +923,7 @@
         plugins: { legend: { display: false } },
         scales: {
           x: { grid: { display: false } },
-          y: { beginAtZero: true, grid: { color: "#1f232f" }, ticks: { precision: 0 } },
+          y: { beginAtZero: true, grid: { color: "#EFE6DC" }, ticks: { precision: 0 } },
         },
       },
     });
